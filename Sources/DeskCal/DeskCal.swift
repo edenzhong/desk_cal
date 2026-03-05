@@ -19,13 +19,13 @@ struct DeskCal {
         print("DeskCal starting...")
 
         do {
-            // 1. 创建简单图片
-            let image = try createSimpleImage()
+            // 1. 创建日历图片
+            let image = try createCalendarImage()
 
             // 2. 保存图片到临时文件
             let tempURL = try saveImageToTempFile(image)
 
-            print("Created image at: \(tempURL.path)")
+            print("Created calendar image at: \(tempURL.path)")
 
             // 3. 设置图片为墙纸
             try setWallpaper(imageURL: tempURL)
@@ -36,62 +36,33 @@ struct DeskCal {
         }
     }
 
-    static func createSimpleImage() throws -> NSImage {
-        // 创建图片尺寸（示例：1920x1080）
-        let width: CGFloat = 1920
-        let height: CGFloat = 1080
+    static func createCalendarImage() throws -> NSImage {
+        // 获取当前年份和月份
+        let (year, month) = DateCalculator.currentYearAndMonth()
+        let (_, _, todayDay) = DateCalculator.today()
 
-        // 创建NSBitmapImageRep
-        let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: Int(width),
-            pixelsHigh: Int(height),
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bytesPerRow: 0,
-            bitsPerPixel: 32
-        )!
+        print("Generating calendar for \(DateCalculator.monthName(for: month)) \(year), today is \(todayDay)")
 
-        // 创建NSGraphicsContext
-        NSGraphicsContext.saveGraphicsState()
-        guard let context = NSGraphicsContext(bitmapImageRep: rep) else {
-            throw NSError(domain: "DeskCal", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create graphics context"])
+        // 获取屏幕尺寸
+        guard let mainScreen = NSScreen.main else {
+            throw NSError(domain: "DeskCal", code: 1,
+                         userInfo: [NSLocalizedDescriptionKey: "No main screen found"])
         }
-        NSGraphicsContext.current = context
 
-        // 绘制纯色背景
-        NSColor.systemBlue.setFill()
-        NSRect(x: 0, y: 0, width: width, height: height).fill()
+        let screenSize = mainScreen.frame.size
+        let width = screenSize.width
+        let height = screenSize.height
 
-        // 绘制文字
-        let text = "Hello Calendar"
-        let font = NSFont.systemFont(ofSize: 72, weight: .bold)
-        let textAttributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: NSColor.white
-        ]
+        print("Screen size: \(width)x\(height)")
 
-        let textSize = text.size(withAttributes: textAttributes)
-        let textRect = NSRect(
-            x: (width - textSize.width) / 2,
-            y: (height - textSize.height) / 2,
-            width: textSize.width,
-            height: textSize.height
-        )
+        // 创建日历生成器配置
+        let config = CalendarConfig.default(width: width, height: height)
 
-        text.draw(in: textRect, withAttributes: textAttributes)
+        // 创建日历生成器
+        let generator = CalendarGenerator(config: config)
 
-        // 恢复上下文
-        NSGraphicsContext.restoreGraphicsState()
-
-        // 创建NSImage
-        let image = NSImage(size: NSSize(width: width, height: height))
-        image.addRepresentation(rep)
-
-        return image
+        // 生成日历图片
+        return try generator.generateMonthCalendar(year: year, month: month, todayDay: todayDay)
     }
 
     static func saveImageToTempFile(_ image: NSImage) throws -> URL {
