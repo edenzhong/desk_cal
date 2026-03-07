@@ -29,6 +29,11 @@ struct DeskCal {
         var updateOnly: Bool = false
         var checkOnly: Bool = false
         var showStatus: Bool = false
+        var installService: Bool = false
+        var uninstallService: Bool = false
+        var startService: Bool = false
+        var stopService: Bool = false
+        var serviceStatus: Bool = false
 
         for i in 1..<arguments.count {
             let arg = arguments[i]
@@ -47,6 +52,16 @@ struct DeskCal {
                 checkOnly = true
             case "--status":
                 showStatus = true
+            case "--install-service":
+                installService = true
+            case "--uninstall-service":
+                uninstallService = true
+            case "--start-service":
+                startService = true
+            case "--stop-service":
+                stopService = true
+            case "--service-status":
+                serviceStatus = true
             case "--help", "-h":
                 printHelp()
                 exit(0)
@@ -58,9 +73,9 @@ struct DeskCal {
         }
 
         // 处理互斥选项
-        let actionCount = [daemonMode, updateOnly, checkOnly, showStatus, testOnly].filter { $0 }.count
+        let actionCount = [daemonMode, updateOnly, checkOnly, showStatus, testOnly, installService, uninstallService, startService, stopService, serviceStatus].filter { $0 }.count
         if actionCount > 1 {
-            logError("Conflicting options specified. Only one of --daemon, --update, --check, --status, --test can be used at a time.")
+            logError("Conflicting options specified. Only one of --daemon, --update, --check, --status, --test, --install-service, --uninstall-service, --start-service, --stop-service, --service-status can be used at a time.")
             printHelp()
             exit(1)
         }
@@ -81,6 +96,21 @@ struct DeskCal {
         } else if testOnly {
             // 测试模式
             performTest(mode: mode)
+        } else if installService {
+            // 安装服务
+            installLaunchdService(mode: mode)
+        } else if uninstallService {
+            // 卸载服务
+            uninstallLaunchdService()
+        } else if startService {
+            // 启动服务
+            startLaunchdService()
+        } else if stopService {
+            // 停止服务
+            stopLaunchdService()
+        } else if serviceStatus {
+            // 检查服务状态
+            checkLaunchdServiceStatus()
         } else {
             // 默认行为：执行启动检查并更新（如果 needed）
             performLaunchCheck(mode: mode)
@@ -234,6 +264,171 @@ struct DeskCal {
         try pngData.write(to: url)
     }
 
+    // MARK: - 服务管理
+
+    /// 安装 launchd 服务
+    private static func installLaunchdService(mode: CalendarMode) {
+        logInfo("Installing launchd service...")
+
+        let fileManager = FileManager.default
+        let resourcesURL = URL(fileURLWithPath: #file)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources")
+        let plistURL = resourcesURL.appendingPathComponent("com.deskcal.plist")
+
+        guard fileManager.fileExists(atPath: plistURL.path) else {
+            logError("Plist file not found at \(plistURL.path)")
+            exit(1)
+        }
+
+        let launchAgentsURL = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents")
+
+        do {
+            if !fileManager.fileExists(atPath: launchAgentsURL.path) {
+                try fileManager.createDirectory(at: launchAgentsURL, withIntermediateDirectories: true)
+            }
+
+            let destinationURL = launchAgentsURL.appendingPathComponent("com.deskcal.plist")
+
+            // 复制 plist 文件
+            try fileManager.copyItem(at: plistURL, to: destinationURL)
+            logInfo("Plist copied to \(destinationURL.path)")
+
+            // 加载服务
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            process.arguments = ["load", destinationURL.path]
+            try process.run()
+            process.waitUntilExit()
+
+            if process.terminationStatus == 0 {
+                logInfo("Service installed and loaded successfully")
+            } else {
+                logError("Failed to load service (exit code: \(process.terminationStatus))")
+                exit(1)
+            }
+        } catch {
+            logError("Failed to install service: \(error)")
+            exit(1)
+        }
+    }
+
+    /// 卸载 launchd 服务
+    private static func uninstallLaunchdService() {
+        logInfo("Uninstalling launchd service...")
+
+        let fileManager = FileManager.default
+        let launchAgentsURL = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents")
+        let plistURL = launchAgentsURL.appendingPathComponent("com.deskcal.plist")
+
+        do {
+            // 如果服务已加载，先卸载
+            if fileManager.fileExists(atPath: plistURL.path) {
+                let unloadProcess = Process()
+                unloadProcess.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+                unloadProcess.arguments = ["unload", plistURL.path]
+                try unloadProcess.run()
+                unloadProcess.waitUntilExit()
+            }
+
+            // 删除 plist 文件
+            if fileManager.fileExists(atPath: plistURL.path) {
+                try fileManager.removeItem(at: plistURL)
+                logInfo("Plist file removed")
+            }
+
+            logInfo("Service uninstalled successfully")
+        } catch {
+            logError("Failed to uninstall service: \(error)")
+            exit(1)
+        }
+    }
+
+    /// 启动 launchd 服务
+    private static func startLaunchdService() {
+        logInfo("Starting launchd service...")
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = ["start", "com.deskcal"]
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 {
+                logInfo("Service started successfully")
+            } else {
+                logError("Failed to start service (exit code: \(process.terminationStatus))")
+                exit(1)
+            }
+        } catch {
+            logError("Failed to start service: \(error)")
+            exit(1)
+        }
+    }
+
+    /// 停止 launchd 服务
+    private static func stopLaunchdService() {
+        logInfo("Stopping launchd service...")
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = ["stop", "com.deskcal"]
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 {
+                logInfo("Service stopped successfully")
+            } else {
+                logError("Failed to stop service (exit code: \(process.terminationStatus))")
+                exit(1)
+            }
+        } catch {
+            logError("Failed to stop service: \(error)")
+            exit(1)
+        }
+    }
+
+    /// 检查 launchd 服务状态
+    private static func checkLaunchdServiceStatus() {
+        logInfo("Checking launchd service status...")
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = ["list", "com.deskcal"]
+
+        do {
+            let outputPipe = Pipe()
+            process.standardOutput = outputPipe
+            try process.run()
+            process.waitUntilExit()
+
+            let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: outputData, encoding: .utf8) ?? ""
+
+            if process.terminationStatus == 0 {
+                if output.contains("com.deskcal") {
+                    print("Service is loaded and running.")
+                    print(output)
+                } else {
+                    print("Service is not loaded.")
+                }
+            } else if process.terminationStatus == 113 {
+                // launchctl error: Could not find service
+                print("Service is not loaded.")
+            } else {
+                print("Service status unknown (exit code: \(process.terminationStatus))")
+            }
+        } catch {
+            logError("Failed to check service status: \(error)")
+            exit(1)
+        }
+    }
+
     // MARK: - 帮助信息
 
     static func printHelp() {
@@ -251,6 +446,11 @@ struct DeskCal {
           -u, --update    Force immediate wallpaper update
           -c, --check     Check update status without updating
           --status        Show detailed status information
+          --install-service Install launchd service (copy plist to LaunchAgents and load)
+          --uninstall-service Uninstall launchd service (unload and remove plist)
+          --start-service Start the launchd service
+          --stop-service  Stop the launchd service
+          --service-status Check launchd service status
           -h, --help      Show this help message
 
         Examples:
