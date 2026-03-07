@@ -97,6 +97,9 @@ struct AppConfig: Codable {
     /// 背景透明度 (0.0 - 1.0)
     var backgroundAlpha: CGFloat = 0.85
 
+    /// 是否在登录时自动启动（可选，缺失时默认为false）
+    var launchAtLogin: Bool? = false
+
     /// 自定义颜色映射（颜色名称到十六进制字符串）
     var customColors: [String: String]?
 

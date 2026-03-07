@@ -2,6 +2,7 @@
 // Main entry point for the DeskCal application
 
 import AppKit
+import CoreServices
 import Foundation
 
 extension NSScreen {
@@ -35,6 +36,8 @@ struct DeskCal {
         var startService: Bool = false
         var stopService: Bool = false
         var serviceStatus: Bool = false
+        var addLoginItem: Bool = false
+        var removeLoginItem: Bool = false
         var configPath: String? = nil
 
         var index = 1
@@ -67,6 +70,10 @@ struct DeskCal {
                 stopService = true
             case "--service-status":
                 serviceStatus = true
+            case "--add-login-item":
+                addLoginItem = true
+            case "--remove-login-item":
+                removeLoginItem = true
             case "--help", "-h":
                 printHelp()
                 exit(0)
@@ -104,9 +111,9 @@ struct DeskCal {
         }
 
         // 处理互斥选项
-        let actionCount = [daemonMode, updateOnly, checkOnly, showStatus, testOnly, installService, uninstallService, startService, stopService, serviceStatus].filter { $0 }.count
+        let actionCount = [daemonMode, updateOnly, checkOnly, showStatus, testOnly, installService, uninstallService, startService, stopService, serviceStatus, addLoginItem, removeLoginItem].filter { $0 }.count
         if actionCount > 1 {
-            logError("Conflicting options specified. Only one of --daemon, --update, --check, --status, --test, --install-service, --uninstall-service, --start-service, --stop-service, --service-status can be used at a time.")
+            logError("Conflicting options specified. Only one of --daemon, --update, --check, --status, --test, --install-service, --uninstall-service, --start-service, --stop-service, --service-status, --add-login-item, --remove-login-item can be used at a time.")
             printHelp()
             exit(1)
         }
@@ -142,6 +149,12 @@ struct DeskCal {
         } else if serviceStatus {
             // 检查服务状态
             checkLaunchdServiceStatus()
+        } else if addLoginItem {
+            // 添加到登录项
+            addToLoginItems()
+        } else if removeLoginItem {
+            // 从登录项移除
+            removeFromLoginItems()
         } else {
             // 默认行为：执行启动检查并更新（如果 needed）
             performLaunchCheck(mode: mode)
@@ -302,16 +315,25 @@ struct DeskCal {
         logInfo("Installing launchd service...")
 
         let fileManager = FileManager.default
-        let resourcesURL = URL(fileURLWithPath: #file)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Resources")
-        let plistURL = resourcesURL.appendingPathComponent("com.deskcal.plist")
 
-        guard fileManager.fileExists(atPath: plistURL.path) else {
-            logError("Plist file not found at \(plistURL.path)")
-            exit(1)
+        // 获取可执行文件路径
+        let executablePath: String
+        if let bundleExecutableURL = Bundle.main.executableURL {
+            executablePath = bundleExecutableURL.path
+        } else {
+            // 回退到命令行参数中的路径
+            let arg0 = CommandLine.arguments[0]
+            if arg0.hasPrefix("/") {
+                // 已经是绝对路径
+                executablePath = arg0
+            } else {
+                // 转换为当前工作目录的绝对路径
+                let currentDirectory = fileManager.currentDirectoryPath
+                executablePath = (currentDirectory as NSString).appendingPathComponent(arg0)
+            }
         }
+
+        logInfo("Using executable path: \(executablePath)")
 
         let launchAgentsURL = fileManager.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents")
@@ -323,9 +345,12 @@ struct DeskCal {
 
             let destinationURL = launchAgentsURL.appendingPathComponent("com.deskcal.plist")
 
-            // 复制 plist 文件
-            try fileManager.copyItem(at: plistURL, to: destinationURL)
-            logInfo("Plist copied to \(destinationURL.path)")
+            // 生成plist内容
+            let plistContent = generateLaunchdPlist(executablePath: executablePath, mode: mode)
+
+            // 写入plist文件
+            try plistContent.write(to: destinationURL, atomically: true, encoding: .utf8)
+            logInfo("Plist generated and saved to \(destinationURL.path)")
 
             // 加载服务
             let process = Process()
@@ -460,6 +485,95 @@ struct DeskCal {
         }
     }
 
+    // MARK: - Plist生成
+
+    /// 生成launchd plist XML内容
+    /// - Parameters:
+    ///   - executablePath: 可执行文件路径
+    ///   - mode: 日历模式
+    /// - Returns: plist XML字符串
+    private static func generateLaunchdPlist(executablePath: String, mode: CalendarMode) -> String {
+        // 转义XML特殊字符
+        func escapeXML(_ string: String) -> String {
+            return string
+                .replacingOccurrences(of: "&", with: "&amp;")
+                .replacingOccurrences(of: "\"", with: "&quot;")
+                .replacingOccurrences(of: "'", with: "&apos;")
+                .replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;")
+        }
+
+        let escapedPath = escapeXML(executablePath)
+
+        return """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>Label</key>
+            <string>com.deskcal</string>
+
+            <key>ProgramArguments</key>
+            <array>
+                <string>\(escapedPath)</string>
+                <string>--daemon</string>
+                <string>--\(mode.rawValue)</string>
+            </array>
+
+            <key>StartCalendarInterval</key>
+            <dict>
+                <key>Hour</key>
+                <integer>0</integer>
+                <key>Minute</key>
+                <integer>0</integer>
+            </dict>
+
+            <!-- 后备：每小时检查一次，确保睡眠唤醒后也能更新 -->
+            <key>StartInterval</key>
+            <integer>3600</integer>
+
+            <key>RunAtLoad</key>
+            <true/>
+
+            <key>StandardOutPath</key>
+            <string>/tmp/com.deskcal.log</string>
+            <key>StandardErrorPath</key>
+            <string>/tmp/com.deskcal.error.log</string>
+
+            <key>EnvironmentVariables</key>
+            <dict>
+                <key>PATH</key>
+                <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+            </dict>
+
+            <key>KeepAlive</key>
+            <false/>
+
+            <key>ProcessType</key>
+            <string>Background</string>
+
+            <key>Nice</key>
+            <integer>10</integer>
+
+            <key>LowPriorityIO</key>
+            <true/>
+        </dict>
+        </plist>
+        """
+    }
+
+    // MARK: - 登录项支持
+
+    /// 将应用添加到登录项
+    private static func addToLoginItems() {
+        logWarning("Login items support is currently disabled due to deprecated APIs. Use launchd service instead.")
+    }
+
+    /// 从登录项中移除应用
+    private static func removeFromLoginItems() {
+        logWarning("Login items support is currently disabled due to deprecated APIs. Use launchd service instead.")
+    }
+
     // MARK: - 帮助信息
 
     static func printHelp() {
@@ -482,6 +596,8 @@ struct DeskCal {
           --start-service Start the launchd service
           --stop-service  Stop the launchd service
           --service-status Check launchd service status
+          --add-login-item Add DeskCal to login items (alternative to launchd)
+          --remove-login-item Remove DeskCal from login items
           --config PATH   Use custom configuration file
           -h, --help      Show this help message
 

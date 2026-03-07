@@ -7,7 +7,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/DeskCal</string>
-        <string>--update</string>
+        <string>--daemon</string>
         <string>--year</string>
     </array>
 
