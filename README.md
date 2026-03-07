@@ -13,6 +13,31 @@ DeskCal 是一个 macOS 桌面日历应用，自动在桌面墙纸上显示日�
 - 通过 launchd 服务实现后台自动运行
 - 完整的命令行控制接口
 
+## 系统要求
+
+- **macOS 11.0** 或更高版本
+- **Swift 6.2** 或更高版本（用于从源码构建）
+- 磁盘空间：约 100 MB（用于构建和运行）
+
+## 快速开始
+
+如果你只是想试用 DeskCal，可以直接运行而不安装到系统路径：
+
+```bash
+# 克隆项目
+git clone https://github.com/yourusername/desk_cal.git
+cd desk_cal
+
+# 构建应用
+swift build -c release
+
+# 直接运行（生成全年日历）
+./.build/release/DeskCal --year
+
+# 或者生成单月日历
+./.build/release/DeskCal --month
+```
+
 ## 安装
 
 ### 从源码构建
@@ -26,14 +51,33 @@ sudo cp .build/release/DeskCal /usr/local/bin/
 
 ### 安装 launchd 服务（可选，用于自动更新）
 
+DeskCal 可以安装为 launchd 服务，在后台自动运行并每天更新墙纸：
+
 ```bash
 DeskCal --install-service
 ```
+
+此命令将：
+1. 复制 `Resources/com.deskcal.plist` 到 `~/Library/LaunchAgents/`
+2. 加载服务到 launchd
+3. 立即启动服务
 
 服务安装后，每天午夜自动更新墙纸。如需立即更新，可运行：
 
 ```bash
 DeskCal --update
+```
+
+**手动安装服务**（如果 `--install-service` 失败）：
+```bash
+# 复制 plist 文件
+cp Resources/com.deskcal.plist ~/Library/LaunchAgents/
+
+# 加载服务
+launchctl load ~/Library/LaunchAgents/com.deskcal.plist
+
+# 启动服务
+launchctl start com.deskcal
 ```
 
 ## 使用方法
@@ -143,6 +187,34 @@ DeskCal 支持通过 JSON 配置文件自定义外观和行为。默认配置文
 1. 命令行参数（如 `--month`）优先于配置文件中的设置
 2. 自定义颜色优先于主题默认颜色
 3. 如果 `show_weekend_colors` 为 `false`，周末颜色将与普通日期相同
+
+## 日志
+
+DeskCal 记录详细的运行日志，便于问题排查：
+
+### 日志位置
+- **控制台日志**：直接输出到标准输出（当直接运行时）
+- **文件日志**：`/tmp/com.deskcal.log`（当作为服务运行时）
+- **错误日志**：`/tmp/com.deskcal.error.log`（仅错误信息）
+
+### 查看日志
+```bash
+# 查看运行日志
+cat /tmp/com.deskcal.log
+
+# 查看错误日志
+cat /tmp/com.deskcal.error.log
+
+# 实时监控日志
+tail -f /tmp/com.deskcal.log
+```
+
+### 日志级别
+默认日志级别为 `INFO`，包含：
+- 程序启动和关闭
+- 墙纸更新操作
+- 配置加载状态
+- 错误信息
 
 ## 故障排除
 
