@@ -1,0 +1,15 @@
+{
+  "theme": "auto",
+  "calendar_mode": "year",
+  "show_weekend_colors": true,
+  "show_month_separators": true,
+  "show_year_title": true,
+  "background_alpha": 0.85,
+  "today_highlight_style": {
+    "type": "circle"
+  },
+  "custom_colors": {
+    "today_highlight_color": "#007AFF",
+    "weekend_text_color": "#FF3B30"
+  }
+}

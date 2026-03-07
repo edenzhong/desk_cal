@@ -128,8 +128,8 @@ struct UpdateScheduler {
 
         logInfo("Screen size: \(width)x\(height)")
 
-        // 创建日历生成器配置
-        let config = CalendarConfig.default(width: width, height: height)
+        // 使用配置管理器获取日历配置
+        let config = ConfigurationManager.shared.getCalendarConfig(width: width, height: height)
         let generator = CalendarGenerator(config: config)
 
         // 获取当前日期

@@ -24,6 +24,7 @@ struct DeskCal {
         // 解析命令行参数
         let arguments = CommandLine.arguments
         var mode: CalendarMode = .year  // 默认全年日历
+        var modeSpecified = false       // 用户是否指定了模式
         var testOnly: Bool = false
         var daemonMode: Bool = false
         var updateOnly: Bool = false
@@ -34,14 +35,18 @@ struct DeskCal {
         var startService: Bool = false
         var stopService: Bool = false
         var serviceStatus: Bool = false
+        var configPath: String? = nil
 
-        for i in 1..<arguments.count {
-            let arg = arguments[i]
+        var index = 1
+        while index < arguments.count {
+            let arg = arguments[index]
             switch arg {
             case "--month", "-m":
                 mode = .month
+                modeSpecified = true
             case "--year", "-y":
                 mode = .year
+                modeSpecified = true
             case "--test", "-t":
                 testOnly = true
             case "--daemon", "-d":
@@ -65,11 +70,37 @@ struct DeskCal {
             case "--help", "-h":
                 printHelp()
                 exit(0)
+            case "--config":
+                // 需要下一个参数作为配置文件路径
+                if index + 1 < arguments.count {
+                    configPath = arguments[index + 1]
+                    // 跳过下一个参数
+                    index += 1
+                } else {
+                    logError("--config requires a file path")
+                    printHelp()
+                    exit(1)
+                }
             default:
                 logWarning("Unknown argument: \(arg)")
                 printHelp()
                 exit(1)
             }
+            index += 1
+        }
+
+        // 设置自定义配置文件路径（如果提供）
+        if let configPath = configPath {
+            let configURL = URL(fileURLWithPath: (configPath as NSString).expandingTildeInPath)
+            ConfigurationManager.customConfigURL = configURL
+            logInfo("Using custom config file: \(configURL.path)")
+        }
+
+        // 如果没有指定模式，使用配置中的模式
+        if !modeSpecified {
+            let configMode = ConfigurationManager.shared.config.calendarMode
+            mode = configMode == .month ? .month : .year
+            logInfo("Using calendar mode from configuration: \(mode.rawValue)")
         }
 
         // 处理互斥选项
@@ -230,8 +261,8 @@ struct DeskCal {
 
         logInfo("Screen size: \(width)x\(height)")
 
-        // 创建日历生成器配置
-        let config = CalendarConfig.default(width: width, height: height)
+        // 使用配置管理器获取日历配置
+        let config = ConfigurationManager.shared.getCalendarConfig(width: width, height: height)
         let generator = CalendarGenerator(config: config)
 
         // 获取当前日期
@@ -451,6 +482,7 @@ struct DeskCal {
           --start-service Start the launchd service
           --stop-service  Stop the launchd service
           --service-status Check launchd service status
+          --config PATH   Use custom configuration file
           -h, --help      Show this help message
 
         Examples:
