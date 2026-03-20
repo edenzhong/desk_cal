@@ -294,6 +294,9 @@ struct CalendarGenerator {
         }
         NSGraphicsContext.current = context
 
+        // 配置高质量渲染设置
+        configureHighQualityRendering()
+
         // 绘制背景
         drawBackground()
 
@@ -313,12 +316,17 @@ struct CalendarGenerator {
         return createImageFromRepresentation(imageRep)
     }
 
-    /// 创建图片上下文
+    /// 创建图片上下文（支持高分辨率屏幕）
     private func createImageContext(width: CGFloat, height: CGFloat) throws -> NSBitmapImageRep {
+        // 获取屏幕缩放因子（Retina支持）
+        let scaleFactor = NSScreen.main?.backingScaleFactor ?? 2.0
+        let scaledWidth = Int(width * scaleFactor)
+        let scaledHeight = Int(height * scaleFactor)
+
         guard let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil,
-            pixelsWide: Int(width),
-            pixelsHigh: Int(height),
+            pixelsWide: scaledWidth,
+            pixelsHigh: scaledHeight,
             bitsPerSample: 8,
             samplesPerPixel: 4,
             hasAlpha: true,
@@ -331,7 +339,36 @@ struct CalendarGenerator {
                           userInfo: [NSLocalizedDescriptionKey: "Failed to create bitmap image representation"])
         }
 
+        // 设置缩放因子以适应高分辨率
+        rep.size = NSSize(width: width, height: height)
+
         return rep
+    }
+
+    /// 配置高质量渲染设置
+    private func configureHighQualityRendering() {
+        guard let cgContext = NSGraphicsContext.current?.cgContext else { return }
+
+        // 启用高质量抗锯齿
+        cgContext.setAllowsAntialiasing(true)
+        cgContext.setShouldAntialias(true)
+
+        // 启用高质量图像插值
+        cgContext.setAllowsFontSmoothing(true)
+        cgContext.setShouldSmoothFonts(true)
+
+        // 启用子像素抗锯齿
+        cgContext.setAllowsFontSubpixelPositioning(true)
+        cgContext.setAllowsFontSubpixelQuantization(true)
+
+        // 设置高质量插值
+        cgContext.interpolationQuality = .high
+
+        // 设置高质量的文本渲染
+        if let graphicsContext = NSGraphicsContext.current {
+            graphicsContext.imageInterpolation = .high
+            graphicsContext.shouldAntialias = true
+        }
     }
 
     /// 绘制背景
@@ -655,6 +692,9 @@ extension CalendarGenerator {
                           userInfo: [NSLocalizedDescriptionKey: "Failed to create graphics context"])
         }
         NSGraphicsContext.current = context
+
+        // 配置高质量渲染设置
+        configureHighQualityRendering()
 
         // 绘制背景
         drawBackground()
