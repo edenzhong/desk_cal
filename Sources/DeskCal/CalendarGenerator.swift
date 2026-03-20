@@ -547,7 +547,7 @@ struct CalendarGenerator {
     private func drawCircleHighlight(cellX: CGFloat, cellY: CGFloat,
                                     cellWidth: CGFloat, cellHeight: CGFloat,
                                     style: VisualStyle) {
-        let circleDiameter = min(cellWidth, cellHeight) * 0.8
+        let circleDiameter = min(cellWidth, cellHeight) * 1.05
         let circleRect = NSRect(
             x: cellX + (cellWidth - circleDiameter) / 2,
             y: cellY + (cellHeight - circleDiameter) / 2,
@@ -964,7 +964,7 @@ extension CalendarGenerator {
                                    cellWidth: CGFloat, cellHeight: CGFloat,
                                    config: CalendarConfig) {
         // 绘制圆形高亮
-        let circleDiameter = min(cellWidth, cellHeight) * 0.8
+        let circleDiameter = min(cellWidth, cellHeight) * 1.05
         let circleRect = NSRect(
             x: cellX + (cellWidth - circleDiameter) / 2,
             y: cellY + (cellHeight - circleDiameter) / 2,
