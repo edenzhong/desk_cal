@@ -94,6 +94,18 @@ struct VisualStyle {
     /// 农历文字大小比例（相对于公历字体）
     var lunarTextSize: CGFloat = 0.75
 
+    /// 是否显示假期
+    var showHolidays: Bool = false
+
+    /// 假期背景颜色
+    var holidayBackgroundColor: NSColor = NSColor(red: 1.0, green: 0.58, blue: 0.0, alpha: 0.3)
+
+    /// 假期边框颜色
+    var holidayBorderColor: NSColor = NSColor(red: 1.0, green: 0.58, blue: 0.0, alpha: 1.0)
+
+    /// 假期文本颜色
+    var holidayTextColor: NSColor = NSColor(red: 0.8, green: 0.4, blue: 0.0, alpha: 1.0)
+
     /// 今天高亮效果样式
     enum TodayHighlightStyle {
         case circle
@@ -154,7 +166,11 @@ struct VisualStyle {
             padding: 40,
             lunarDateColor: NSColor(red: 0.55, green: 0.55, blue: 0.58, alpha: 1.0),
             lunarFestivalColor: NSColor.systemRed,
-            lunarSolarTermColor: NSColor.systemBlue
+            lunarSolarTermColor: NSColor.systemBlue,
+            showHolidays: false,
+            holidayBackgroundColor: NSColor(red: 1.0, green: 0.58, blue: 0.0, alpha: 0.3),
+            holidayBorderColor: NSColor(red: 1.0, green: 0.58, blue: 0.0, alpha: 1.0),
+            holidayTextColor: NSColor(red: 0.8, green: 0.4, blue: 0.0, alpha: 1.0)
         )
     }
 
@@ -190,7 +206,11 @@ struct VisualStyle {
             padding: 40,
             lunarDateColor: NSColor(white: 0.7, alpha: 1.0),
             lunarFestivalColor: NSColor.systemRed,
-            lunarSolarTermColor: NSColor.systemBlue
+            lunarSolarTermColor: NSColor.systemBlue,
+            showHolidays: false,
+            holidayBackgroundColor: NSColor(red: 1.0, green: 0.6, blue: 0.0, alpha: 0.25),
+            holidayBorderColor: NSColor(red: 1.0, green: 0.6, blue: 0.0, alpha: 1.0),
+            holidayTextColor: NSColor(red: 1.0, green: 0.7, blue: 0.0, alpha: 1.0)
         )
     }
 
@@ -507,6 +527,17 @@ struct CalendarGenerator {
                 let isWeekend = colIndex == 0 || colIndex == 6  // 周日(0)和周六(6)
                 let isToday = today == day
 
+                // 检查是否是假期
+                var isHoliday = false
+                if config.style.showHolidays {
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.calendar = Calendar.current
+                    let dateComponents = DateComponents(year: year, month: month, day: day)
+                    if let date = dateFormatter.calendar.date(from: dateComponents) {
+                        isHoliday = HolidayService.shared.isHolidaySync(date)
+                    }
+                }
+
                 // 计算文本宽度（用于调整今天高亮圆形大小）
                 let textWidth = calculateDayTextWidth(
                     day: day,
@@ -516,6 +547,13 @@ struct CalendarGenerator {
                     cellHeight: layout.rowHeight,
                     config: config
                 )
+
+                // 绘制假期高亮背景
+                if isHoliday {
+                    drawHolidayHighlight(cellX: cellX, cellY: cellY,
+                                      cellWidth: layout.columnWidth, cellHeight: layout.rowHeight,
+                                      style: config.style)
+                }
 
                 // 绘制今天的高亮背景
                 if isToday {
@@ -527,7 +565,7 @@ struct CalendarGenerator {
                 // 绘制日期文本（传递 year 和 month 用于农历计算）
                 drawDayText(day: day, year: year, month: month, cellX: cellX, cellY: cellY,
                            cellWidth: layout.columnWidth, cellHeight: layout.rowHeight,
-                           isWeekend: isWeekend, isToday: isToday)
+                           isWeekend: isWeekend, isToday: isToday, isHoliday: isHoliday, config: config)
             }
         }
     }
@@ -577,7 +615,7 @@ struct CalendarGenerator {
     @MainActor
     private func drawDayText(day: Int, year: Int, month: Int, cellX: CGFloat, cellY: CGFloat,
                             cellWidth: CGFloat, cellHeight: CGFloat,
-                            isWeekend: Bool, isToday: Bool) {
+                            isWeekend: Bool, isToday: Bool, isHoliday: Bool = false) {
         // 重新实现以支持农历日期显示
         drawDayText(
             day: day,
@@ -589,6 +627,7 @@ struct CalendarGenerator {
             cellHeight: cellHeight,
             isWeekend: isWeekend,
             isToday: isToday,
+            isHoliday: isHoliday,
             config: config
         )
     }
@@ -879,6 +918,17 @@ extension CalendarGenerator {
                 let isWeekend = colIndex == 0 || colIndex == 6  // 周日(0)和周六(6)
                 let isToday = today == day
 
+                // 检查是否是假期
+                var isHoliday = false
+                if config.style.showHolidays {
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.calendar = Calendar.current
+                    let dateComponents = DateComponents(year: year, month: month, day: day)
+                    if let date = dateFormatter.calendar.date(from: dateComponents) {
+                        isHoliday = HolidayService.shared.isHolidaySync(date)
+                    }
+                }
+
                 // 计算文本宽度（用于调整今天高亮圆形大小）
                 let textWidth = calculateDayTextWidth(
                     day: day,
@@ -888,6 +938,13 @@ extension CalendarGenerator {
                     cellHeight: layout.rowHeight,
                     config: config
                 )
+
+                // 绘制假期高亮背景
+                if isHoliday {
+                    drawHolidayHighlight(cellX: cellX, cellY: cellY,
+                                      cellWidth: layout.columnWidth, cellHeight: layout.rowHeight,
+                                      style: config.style)
+                }
 
                 // 绘制今天的高亮背景
                 if isToday {
@@ -912,6 +969,7 @@ extension CalendarGenerator {
                     cellHeight: layout.rowHeight,
                     isWeekend: isWeekend,
                     isToday: isToday,
+                    isHoliday: isHoliday,
                     config: config
                 )
             }
@@ -1008,7 +1066,7 @@ extension CalendarGenerator {
     @MainActor
     private func drawDayText(day: Int, year: Int, month: Int, cellX: CGFloat, cellY: CGFloat,
                             cellWidth: CGFloat, cellHeight: CGFloat,
-                            isWeekend: Bool, isToday: Bool,
+                            isWeekend: Bool, isToday: Bool, isHoliday: Bool = false,
                             config: CalendarConfig) {
         let dayString = "\(day)"
 
@@ -1026,6 +1084,9 @@ extension CalendarGenerator {
         if isToday {
             // 今天日期使用对比色（在高亮背景上可见）
             textColor = config.style.todayTextColor
+        } else if isHoliday {
+            // 假期使用特殊颜色
+            textColor = config.style.holidayTextColor
         } else if isWeekend {
             textColor = config.style.weekendTextColor
         } else {
@@ -1157,5 +1218,27 @@ extension CalendarGenerator {
         )
 
         lunarText.draw(in: textRect, withAttributes: attributes)
+    }
+
+    /// 绘制假期高亮背景
+    private func drawHolidayHighlight(cellX: CGFloat, cellY: CGFloat,
+                                     cellWidth: CGFloat, cellHeight: CGFloat,
+                                     style: VisualStyle) {
+        let highlightRect = NSRect(
+            x: cellX + 2,
+            y: cellY + 2,
+            width: cellWidth - 4,
+            height: cellHeight - 4
+        )
+
+        // 绘制背景
+        style.holidayBackgroundColor.setFill()
+        NSBezierPath(rect: highlightRect).fill()
+
+        // 绘制边框
+        style.holidayBorderColor.setStroke()
+        let borderPath = NSBezierPath(roundedRect: highlightRect, xRadius: 4, yRadius: 4)
+        borderPath.lineWidth = 1.5
+        borderPath.stroke()
     }
 }

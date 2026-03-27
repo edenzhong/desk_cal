@@ -122,6 +122,22 @@ struct AppConfig: Codable {
     /// 农历文字大小（相对于公历字体大小的比例）
     var lunarTextSize: CGFloat = 0.75
 
+    /// 是否显示假期
+    var showHolidays: Bool = false
+
+    /// 假期缓存有效期（天）
+    var holidayCacheDays: Int = 30
+
+    /// 假期高亮样式
+    enum HolidayHighlightStyle: String, Codable {
+        case background // 背景色
+        case border    // 边框
+        case icon      // 图标
+    }
+
+    /// 假期高亮样式
+    var holidayHighlightStyle: HolidayHighlightStyle = .background
+
     /// 默认配置
     static let `default` = AppConfig()
 
@@ -197,6 +213,9 @@ struct AppConfig: Codable {
         modifiedStyle.showLunarDate = showLunarDate
         modifiedStyle.lunarTextSize = lunarTextSize
 
+        // 应用假期配置
+        modifiedStyle.showHolidays = showHolidays
+
         return modifiedStyle
     }
 
@@ -237,8 +256,14 @@ struct AppConfig: Codable {
                 modifiedStyle.lunarDateColor = color
             case "lunarfestivalcolor":
                 modifiedStyle.lunarFestivalColor = color
-            case "lunarsolarmtermcolor":
+            case "lunarsolarmtermcolor", "lunarsolartermcolor":
                 modifiedStyle.lunarSolarTermColor = color
+            case "holidaybackgroundcolor":
+                modifiedStyle.holidayBackgroundColor = color
+            case "holidaytextcolor":
+                modifiedStyle.holidayTextColor = color
+            case "holidaybordercolor":
+                modifiedStyle.holidayBorderColor = color
             default:
                 logWarning("Unknown color name: \(colorName)")
             }

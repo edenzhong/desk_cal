@@ -4,12 +4,24 @@
   "show_weekend_colors": true,
   "show_month_separators": true,
   "show_year_title": true,
-  "background_alpha": 0.85,
+  "background_alpha": 1.85,
   "today_highlight_style": {
     "type": "circle"
   },
+  "show_lunar_date": false,
+  "lunar_date_format": "short",
+  "lunar_text_size": 0.75,
+  "show_holidays": true,
+  "holiday_cache_days": 30,
+  "holiday_highlight_style": "background",
   "custom_colors": {
     "today_highlight_color": "#007AFF",
-    "weekend_text_color": "#FF3B30"
+    "weekend_text_color": "#FF3B30",
+    "lunar_date_color": "#8E8E93",
+    "lunar_festival_color": "#FF3B30",
+    "lunar_solar_term_color": "#007AFF",
+    "holiday_background_color": "#FF9500",
+    "holiday_text_color": "#CC5500",
+    "holiday_border_color": "#FF9500"
   }
 }
