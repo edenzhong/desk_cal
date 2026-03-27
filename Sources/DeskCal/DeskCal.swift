@@ -103,6 +103,14 @@ struct DeskCal {
             logInfo("Using custom config file: \(configURL.path)")
         }
 
+        // 检查环境变量 DESKCAL_CONFIG_PATH
+        if ProcessInfo.processInfo.environment["DESKCAL_CONFIG_PATH"] != nil {
+            let envConfigPath = ProcessInfo.processInfo.environment["DESKCAL_CONFIG_PATH"]!
+            let configURL = URL(fileURLWithPath: (envConfigPath as NSString).expandingTildeInPath)
+            ConfigurationManager.customConfigURL = configURL
+            logInfo("Using config file from environment: \(configURL.path)")
+        }
+
         // 如果没有指定模式，使用配置中的模式
         if !modeSpecified {
             let configMode = ConfigurationManager.shared.config.calendarMode

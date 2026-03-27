@@ -106,6 +106,22 @@ struct AppConfig: Codable {
     /// 今天高亮样式
     var todayHighlightStyle: ConfigTodayHighlightStyle?
 
+    /// 是否显示农历日期
+    var showLunarDate: Bool = false
+
+    /// 农历日期格式
+    enum LunarDateFormat: String, Codable {
+        case short   // 初一/十五
+        case full    // 三月初五
+        case numeric // 3/5
+    }
+
+    /// 农历日期格式
+    var lunarDateFormat: LunarDateFormat = .short
+
+    /// 农历文字大小（相对于公历字体大小的比例）
+    var lunarTextSize: CGFloat = 0.6
+
     /// 默认配置
     static let `default` = AppConfig()
 
@@ -177,6 +193,10 @@ struct AppConfig: Codable {
             modifiedStyle.weekendTextColor = modifiedStyle.dayTextColor
         }
 
+        // 应用农历配置
+        modifiedStyle.showLunarDate = showLunarDate
+        modifiedStyle.lunarTextSize = lunarTextSize
+
         return modifiedStyle
     }
 
@@ -191,25 +211,34 @@ struct AppConfig: Codable {
                 continue
             }
 
-            switch colorName {
-            case "backgroundColor":
+            // 支持驼峰和下划线两种命名方式
+            let normalizedKey = colorName.replacingOccurrences(of: "_", with: "").lowercased()
+
+            switch normalizedKey {
+            case "backgroundcolor":
                 modifiedStyle.backgroundColor = color
-            case "monthTitleColor":
+            case "monthtitlecolor":
                 modifiedStyle.monthTitleColor = color
-            case "weekdayTitleColor":
+            case "weekdaytitlecolor":
                 modifiedStyle.weekdayTitleColor = color
-            case "dayTextColor":
+            case "daytextcolor":
                 modifiedStyle.dayTextColor = color
-            case "weekendTextColor":
+            case "weekendtextcolor":
                 modifiedStyle.weekendTextColor = color
-            case "todayHighlightColor":
+            case "todayhighlightcolor":
                 modifiedStyle.todayHighlightColor = color
-            case "todayTextColor":
+            case "todaytextcolor":
                 modifiedStyle.todayTextColor = color
-            case "monthSeparatorColor":
+            case "monthseparatorcolor":
                 modifiedStyle.monthSeparatorColor = color
-            case "yearTitleColor":
+            case "yeartitlecolor":
                 modifiedStyle.yearTitleColor = color
+            case "lunardatecolor":
+                modifiedStyle.lunarDateColor = color
+            case "lunarfestivalcolor":
+                modifiedStyle.lunarFestivalColor = color
+            case "lunarsolarmtermcolor":
+                modifiedStyle.lunarSolarTermColor = color
             default:
                 logWarning("Unknown color name: \(colorName)")
             }
@@ -292,7 +321,8 @@ class ConfigurationManager {
     /// - Returns: 日历配置
     func getCalendarConfig(width: CGFloat, height: CGFloat) -> CalendarConfig {
         let visualStyle = config.toVisualStyle()
-        return CalendarConfig(width: width, height: height, style: visualStyle)
+        let lunarFormat = config.lunarDateFormat.rawValue
+        return CalendarConfig(width: width, height: height, style: visualStyle, lunarDateFormat: lunarFormat)
     }
 }
 

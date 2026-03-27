@@ -72,6 +72,47 @@
   - 无图形界面依赖，通过命令行参数和配置文件进行控制
   - 可选：通过系统 API 创建简单的菜单栏控制项（需要额外开发）
 
+### 农历功能技术选型
+| 方案 | 推荐度 | 说明 |
+|------|--------|------|
+| **Lunar-iOS** | ⭐⭐⭐⭐⭐ | 纯Swift实现的农历库，支持公历转农历、节气计算、节日判断 |
+| SwiftLunar | ⭐⭐⭐⭐ | 另一个Swift农历库，功能类似 |
+| 自研算法 | ⭐⭐ | 实现复杂，维护成本高 |
+
+**推荐方案**：使用 [Lunar-iOS](https://github.com/Nightonke/Lunar-iOS)
+- 纯Swift实现，无需外部依赖
+- 功能完善：支持公历/农历互转、节气、节日
+- 活跃维护，Star数高
+- 轻量级，适合命令行工具集成
+
+### 假期API技术选型
+| 方案 | 推荐度 | 说明 |
+|------|--------|------|
+| **timor.tech** | ⭐⭐⭐⭐⭐ | 免费公开API，返回JSON数据，无需认证 |
+| 节假日数据API | ⭐⭐⭐⭐ | 另一个免费的节假日API |
+| 硬编码假期数据 | ⭐⭐ | 需要手动维护，灵活性差 |
+
+**推荐方案**：使用 [timor.tech](https://timor.tech/api/holiday)
+
+**API信息**：
+- 基础URL：`https://timor.tech/api/holiday`
+- 接口示例：
+  - `GET /holiday/{year}/{month}/{day}` - 查询某天是否为节假日
+  - `GET /holiday/{year}/{month}` - 查询某月的节假日
+  - `GET /holiday/{year}` - 查询某年的节假日
+- 返回数据格式：
+```json
+{
+  "code": 0,
+  "holiday": {
+    "holiday": true,
+    "name": "春节",
+    "wage": 3,
+    "date": "2026-02-17"
+  }
+}
+```
+
 ## 技术决策理由
 
 ### 为什么可以在无 Xcode IDE 环境下开发？

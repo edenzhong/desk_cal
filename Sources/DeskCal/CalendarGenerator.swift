@@ -79,6 +79,21 @@ struct VisualStyle {
     /// 内边距
     var padding: CGFloat
 
+    /// 是否显示农历日期
+    var showLunarDate: Bool = false
+
+    /// 农历日期颜色
+    var lunarDateColor: NSColor = NSColor.gray
+
+    /// 农历节日颜色
+    var lunarFestivalColor: NSColor = NSColor.systemRed
+
+    /// 农历节气颜色
+    var lunarSolarTermColor: NSColor = NSColor.systemBlue
+
+    /// 农历文字大小比例（相对于公历字体）
+    var lunarTextSize: CGFloat = 0.6
+
     /// 今天高亮效果样式
     enum TodayHighlightStyle {
         case circle
@@ -136,7 +151,10 @@ struct VisualStyle {
                 opacity: 0.1
             ),
             gradient: nil,
-            padding: 40
+            padding: 40,
+            lunarDateColor: NSColor(red: 0.55, green: 0.55, blue: 0.58, alpha: 1.0),
+            lunarFestivalColor: NSColor.systemRed,
+            lunarSolarTermColor: NSColor.systemBlue
         )
     }
 
@@ -169,7 +187,10 @@ struct VisualStyle {
                 opacity: 0.3
             ),
             gradient: nil,
-            padding: 40
+            padding: 40,
+            lunarDateColor: NSColor(white: 0.7, alpha: 1.0),
+            lunarFestivalColor: NSColor.systemRed,
+            lunarSolarTermColor: NSColor.systemBlue
         )
     }
 
@@ -205,6 +226,8 @@ struct CalendarConfig {
     var style: VisualStyle
     /// 内边距（覆盖样式中的内边距，如果提供）
     var padding: CGFloat?
+    /// 农历日期格式
+    var lunarDateFormat: String = "short"
 
     /// 默认配置
     static func `default`(width: CGFloat = 1920, height: CGFloat = 1080, style: VisualStyle = .default()) -> CalendarConfig {
@@ -212,7 +235,8 @@ struct CalendarConfig {
             width: width,
             height: height,
             style: style,
-            padding: nil
+            padding: nil,
+            lunarDateFormat: "short"
         )
     }
 
@@ -222,7 +246,8 @@ struct CalendarConfig {
             width: width,
             height: height,
             style: .lightTheme(),
-            padding: nil
+            padding: nil,
+            lunarDateFormat: "short"
         )
     }
 
@@ -232,7 +257,8 @@ struct CalendarConfig {
             width: width,
             height: height,
             style: .darkTheme(),
-            padding: nil
+            padding: nil,
+            lunarDateFormat: "short"
         )
     }
 
@@ -242,7 +268,8 @@ struct CalendarConfig {
             width: width,
             height: height,
             style: .transparentTheme(),
-            padding: nil
+            padding: nil,
+            lunarDateFormat: "short"
         )
     }
 
@@ -279,6 +306,7 @@ struct CalendarGenerator {
     ///   - month: 月份 (1-12)
     ///   - todayDay: 今天的日期（可选，用于高亮显示）
     /// - Returns: 生成的日历图片
+    @MainActor
     func generateMonthCalendar(year: Int, month: Int, todayDay: Int? = nil) throws -> NSImage {
         // 创建图片上下文
         let imageRep = try createImageContext(width: config.width, height: config.height)
@@ -309,8 +337,8 @@ struct CalendarGenerator {
         // 绘制星期标题
         drawWeekdayTitles(layout: layout)
 
-        // 绘制日期网格
-        drawDayGrid(year: year, month: month, layout: layout, todayDay: todayDay)
+        // 绘制日期网格（传递 year 和 month 用于农历计算）
+        drawDayGridForSingleMonth(year: year, month: month, layout: layout, todayDay: todayDay)
 
         // 创建并返回图片
         return createImageFromRepresentation(imageRep)
@@ -456,8 +484,9 @@ struct CalendarGenerator {
         }
     }
 
-    /// 绘制日期网格
-    private func drawDayGrid(year: Int, month: Int, layout: CalendarLayout, todayDay: Int?) {
+    /// 绘制日期网格（单月日历版本）
+    @MainActor
+    private func drawDayGridForSingleMonth(year: Int, month: Int, layout: CalendarLayout, todayDay: Int?) {
         let matrix = DateCalculator.generateCalendarMatrix(year: year, month: month)
         let today = todayDay
 
@@ -484,8 +513,8 @@ struct CalendarGenerator {
                                        cellWidth: layout.columnWidth, cellHeight: layout.rowHeight)
                 }
 
-                // 绘制日期文本
-                drawDayText(day: day, cellX: cellX, cellY: cellY,
+                // 绘制日期文本（传递 year 和 month 用于农历计算）
+                drawDayText(day: day, year: year, month: month, cellX: cellX, cellY: cellY,
                            cellWidth: layout.columnWidth, cellHeight: layout.rowHeight,
                            isWeekend: isWeekend, isToday: isToday)
             }
@@ -608,46 +637,24 @@ struct CalendarGenerator {
     }
 
 
-    /// 绘制日期文本
-    private func drawDayText(day: Int, cellX: CGFloat, cellY: CGFloat,
+    /// 绘制日期文本（单月日历版本）
+    @MainActor
+    private func drawDayText(day: Int, year: Int, month: Int, cellX: CGFloat, cellY: CGFloat,
                             cellWidth: CGFloat, cellHeight: CGFloat,
                             isWeekend: Bool, isToday: Bool) {
-        let dayString = "\(day)"
-
-        // 选择字体和颜色
-        let font: NSFont
-        if isToday {
-            // 今天使用粗体版本
-            let baseFont = config.style.dayFont
-            font = NSFont.systemFont(ofSize: baseFont.pointSize, weight: .bold)
-        } else {
-            font = config.style.dayFont
-        }
-
-        let textColor: NSColor
-        if isToday {
-            // 今天日期使用对比色（在高亮背景上可见）
-            textColor = config.style.todayTextColor
-        } else if isWeekend {
-            textColor = config.style.weekendTextColor
-        } else {
-            textColor = config.style.dayTextColor
-        }
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: textColor
-        ]
-
-        let textSize = dayString.size(withAttributes: attributes)
-        let textRect = NSRect(
-            x: cellX + (cellWidth - textSize.width) / 2,
-            y: cellY + (cellHeight - textSize.height) / 2,
-            width: textSize.width,
-            height: textSize.height
+        // 重新实现以支持农历日期显示
+        drawDayText(
+            day: day,
+            year: year,
+            month: month,
+            cellX: cellX,
+            cellY: cellY,
+            cellWidth: cellWidth,
+            cellHeight: cellHeight,
+            isWeekend: isWeekend,
+            isToday: isToday,
+            config: config
         )
-
-        dayString.draw(in: textRect, withAttributes: attributes)
     }
 
     /// 从位图表示创建图片
@@ -678,6 +685,7 @@ extension CalendarGenerator {
     ///   - year: 年份
     ///   - todayDate: 今天的日期（可选，用于高亮显示）
     /// - Returns: 生成的日历图片
+    @MainActor
     func generateYearCalendar(year: Int, todayDate: (month: Int, day: Int)? = nil) throws -> NSImage {
         // 创建图片上下文
         let imageRep = try createImageContext(width: config.width, height: config.height)
@@ -746,6 +754,7 @@ extension CalendarGenerator {
     ///   - todayDay: 今天的日期（可选）
     ///   - monthLayout: 月份布局信息
     ///   - config: 月份特定的配置
+    @MainActor
     private func drawMonthCalendar(
         year: Int,
         month: Int,
@@ -913,6 +922,7 @@ extension CalendarGenerator {
     }
 
     /// 绘制日期网格（在指定区域内）
+    @MainActor
     private func drawDayGrid(year: Int, month: Int, layout: CalendarLayout,
                             monthLayout: MonthLayout, todayDay: Int?, config: CalendarConfig) {
         let matrix = DateCalculator.generateCalendarMatrix(year: year, month: month)
@@ -947,6 +957,8 @@ extension CalendarGenerator {
                 // 绘制日期文本
                 drawDayText(
                     day: day,
+                    year: year,
+                    month: month,
                     cellX: cellX,
                     cellY: cellY,
                     cellWidth: layout.columnWidth,
@@ -978,7 +990,8 @@ extension CalendarGenerator {
     }
 
     /// 绘制日期文本
-    private func drawDayText(day: Int, cellX: CGFloat, cellY: CGFloat,
+    @MainActor
+    private func drawDayText(day: Int, year: Int, month: Int, cellX: CGFloat, cellY: CGFloat,
                             cellWidth: CGFloat, cellHeight: CGFloat,
                             isWeekend: Bool, isToday: Bool,
                             config: CalendarConfig) {
@@ -1009,14 +1022,82 @@ extension CalendarGenerator {
             .foregroundColor: textColor
         ]
 
+        // 计算垂直位置
+        var textY = cellY + (cellHeight - font.pointSize) / 2
+
+        // 如果显示农历日期，调整公历日期垂直位置
+        var lunarText: String? = nil
+        if config.style.showLunarDate {
+            // 计算农历日期
+            let dateFormatter = DateFormatter()
+            dateFormatter.calendar = Calendar.current
+            let dateComponents = DateComponents(year: year, month: month, day: day)
+            if let date = dateFormatter.calendar.date(from: dateComponents) {
+                let lunarDate = LunarDateConverter.shared.convert(date)
+                lunarText = LunarDateConverter.shared.format(lunarDate, format: config.lunarDateFormat)
+            }
+
+            // 调整公历日期位置向上移动
+            textY = cellY + (cellHeight - font.pointSize) / 2 + (cellHeight * config.style.lunarTextSize * 0.5)
+        }
+
         let textSize = dayString.size(withAttributes: attributes)
         let textRect = NSRect(
             x: cellX + (cellWidth - textSize.width) / 2,
-            y: cellY + (cellHeight - textSize.height) / 2,
+            y: textY,
             width: textSize.width,
             height: textSize.height
         )
 
         dayString.draw(in: textRect, withAttributes: attributes)
+
+        // 绘制农历日期
+        if let lunarText = lunarText {
+            drawLunarText(
+                lunarText: lunarText,
+                cellX: cellX,
+                cellY: cellY,
+                cellWidth: cellWidth,
+                cellHeight: cellHeight,
+                config: config
+            )
+        }
+    }
+
+    /// 绘制农历日期文本
+    @MainActor
+    private func drawLunarText(lunarText: String, cellX: CGFloat, cellY: CGFloat,
+                               cellWidth: CGFloat, cellHeight: CGFloat,
+                               config: CalendarConfig) {
+        let fontSize = config.style.dayFont.pointSize * config.style.lunarTextSize
+        let lunarFont = NSFont.systemFont(ofSize: fontSize, weight: .light)
+
+        // 判断是否是节日或节气
+        let isFestival = LunarDateConverter.shared.isFestival(lunarText)
+        let isSolarTerm = LunarDateConverter.shared.isSolarTerm(lunarText)
+
+        let textColor: NSColor
+        if isFestival {
+            textColor = config.style.lunarFestivalColor
+        } else if isSolarTerm {
+            textColor = config.style.lunarSolarTermColor
+        } else {
+            textColor = config.style.lunarDateColor
+        }
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: lunarFont,
+            .foregroundColor: textColor
+        ]
+
+        let textSize = lunarText.size(withAttributes: attributes)
+        let textRect = NSRect(
+            x: cellX + (cellWidth - textSize.width) / 2,
+            y: cellY + (cellHeight - fontSize) / 2 - (cellHeight * config.style.lunarTextSize * 0.5),
+            width: textSize.width,
+            height: textSize.height
+        )
+
+        lunarText.draw(in: textRect, withAttributes: attributes)
     }
 }
