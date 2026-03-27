@@ -507,10 +507,21 @@ struct CalendarGenerator {
                 let isWeekend = colIndex == 0 || colIndex == 6  // 周日(0)和周六(6)
                 let isToday = today == day
 
+                // 计算文本宽度（用于调整今天高亮圆形大小）
+                let textWidth = calculateDayTextWidth(
+                    day: day,
+                    year: year,
+                    month: month,
+                    cellWidth: layout.columnWidth,
+                    cellHeight: layout.rowHeight,
+                    config: config
+                )
+
                 // 绘制今天的高亮背景
                 if isToday {
                     drawTodayHighlight(cellX: cellX, cellY: cellY,
-                                       cellWidth: layout.columnWidth, cellHeight: layout.rowHeight)
+                                       cellWidth: layout.columnWidth, cellHeight: layout.rowHeight,
+                                       textWidth: textWidth, style: config.style)
                 }
 
                 // 绘制日期文本（传递 year 和 month 用于农历计算）
@@ -523,117 +534,42 @@ struct CalendarGenerator {
 
     /// 绘制今天的高亮背景
     private func drawTodayHighlight(cellX: CGFloat, cellY: CGFloat,
-                                   cellWidth: CGFloat, cellHeight: CGFloat) {
-        drawTodayHighlight(cellX: cellX, cellY: cellY,
-                          cellWidth: cellWidth, cellHeight: cellHeight,
-                          style: config.style)
-    }
-
-    /// 绘制今天的高亮背景（内部实现，使用样式）
-    private func drawTodayHighlight(cellX: CGFloat, cellY: CGFloat,
                                    cellWidth: CGFloat, cellHeight: CGFloat,
-                                   style: VisualStyle) {
-        // 保存图形状态以应用阴影
-        NSGraphicsContext.saveGraphicsState()
-        defer { NSGraphicsContext.restoreGraphicsState() }
+                                   textWidth: CGFloat, style: VisualStyle) {
+        // 使用圆角矩形精确包裹文本区域，避免圆形过大
+        let textHeight = style.dayFont.pointSize
+        let lunarTextHeight = textHeight * style.lunarTextSize
+        let totalTextHeight = max(textHeight, lunarTextHeight)
 
-        // 应用阴影效果（如果存在）
-        if let shadow = style.shadow {
-            let shadowColor = shadow.color.withAlphaComponent(shadow.opacity)
-            let shadowOffset = shadow.offset
-            let shadowBlur = shadow.blurRadius
+        // 计算高亮矩形的尺寸
+        let highlightWidth: CGFloat
+        let highlightHeight: CGFloat
 
-            let shadowObject = NSShadow()
-            shadowObject.shadowColor = shadowColor
-            shadowObject.shadowOffset = shadowOffset
-            shadowObject.shadowBlurRadius = shadowBlur
-            shadowObject.set()
+        if style.showLunarDate && textWidth > 0 {
+            // 有农历时，宽度基于文本宽度，高度基于字体大小
+            highlightWidth = min(textWidth * 1.15, cellWidth * 0.95)
+            highlightHeight = min(totalTextHeight * 1.4, cellHeight * 0.9)
+        } else {
+            // 无农历时，使用圆形（或接近圆形的圆角矩形）
+            let diameter = min(cellWidth, cellHeight) * 0.85
+            highlightWidth = diameter
+            highlightHeight = diameter
         }
 
-        // 根据高亮样式绘制
-        switch style.todayHighlightStyle {
-        case .circle:
-            drawCircleHighlight(cellX: cellX, cellY: cellY,
-                               cellWidth: cellWidth, cellHeight: cellHeight,
-                               style: style)
-        case .roundedRect(let cornerRadius):
-            drawRoundedRectHighlight(cellX: cellX, cellY: cellY,
-                                    cellWidth: cellWidth, cellHeight: cellHeight,
-                                    cornerRadius: cornerRadius, style: style)
-        case .underline(let thickness):
-            drawUnderlineHighlight(cellX: cellX, cellY: cellY,
-                                  cellWidth: cellWidth, cellHeight: cellHeight,
-                                  thickness: thickness, style: style)
-        case .gradient:
-            // 暂时用圆形替代渐变高亮
-            drawCircleHighlight(cellX: cellX, cellY: cellY,
-                               cellWidth: cellWidth, cellHeight: cellHeight,
-                               style: style)
-        }
-    }
+        // 计算圆角半径
+        let cornerRadius = min(highlightWidth, highlightHeight) / 2
 
-    /// 绘制圆形高亮
-    private func drawCircleHighlight(cellX: CGFloat, cellY: CGFloat,
-                                    cellWidth: CGFloat, cellHeight: CGFloat,
-                                    style: VisualStyle) {
-        let circleDiameter = min(cellWidth, cellHeight) * 1.05
-        let circleRect = NSRect(
-            x: cellX + (cellWidth - circleDiameter) / 2,
-            y: cellY + (cellHeight - circleDiameter) / 2,
-            width: circleDiameter,
-            height: circleDiameter
+        // 居中绘制圆角矩形
+        let highlightRect = NSRect(
+            x: cellX + (cellWidth - highlightWidth) / 2,
+            y: cellY + (cellHeight - highlightHeight) / 2,
+            width: highlightWidth,
+            height: highlightHeight
         )
 
         style.todayHighlightColor.setFill()
-        let path = NSBezierPath(ovalIn: circleRect)
+        let path = NSBezierPath(roundedRect: highlightRect, xRadius: cornerRadius, yRadius: cornerRadius)
         path.fill()
-    }
-
-    /// 绘制圆角矩形高亮
-    private func drawRoundedRectHighlight(cellX: CGFloat, cellY: CGFloat,
-                                         cellWidth: CGFloat, cellHeight: CGFloat,
-                                         cornerRadius: CGFloat, style: VisualStyle) {
-        let rectWidth = cellWidth * 0.8
-        let rectHeight = cellHeight * 0.8
-        let rect = NSRect(
-            x: cellX + (cellWidth - rectWidth) / 2,
-            y: cellY + (cellHeight - rectHeight) / 2,
-            width: rectWidth,
-            height: rectHeight
-        )
-
-        style.todayHighlightColor.setFill()
-        let path = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-        path.fill()
-    }
-
-    /// 绘制下划线高亮
-    private func drawUnderlineHighlight(cellX: CGFloat, cellY: CGFloat,
-                                       cellWidth: CGFloat, cellHeight: CGFloat,
-                                       thickness: CGFloat, style: VisualStyle) {
-        let underlineWidth = cellWidth * 0.6
-        let underlineHeight = thickness
-        let underlineRect = NSRect(
-            x: cellX + (cellWidth - underlineWidth) / 2,
-            y: cellY + cellHeight * 0.2 - underlineHeight / 2,
-            width: underlineWidth,
-            height: underlineHeight
-        )
-
-        style.todayHighlightColor.setFill()
-        let path = NSBezierPath(rect: underlineRect)
-        path.fill()
-    }
-
-    /// 绘制渐变高亮（暂时用圆形替代）
-    private func drawGradientHighlight(cellX: CGFloat, cellY: CGFloat,
-                                      cellWidth: CGFloat, cellHeight: CGFloat,
-                                      gradientStyle: VisualStyle.GradientStyle,
-                                      style: VisualStyle) {
-        // 暂时用圆形替代渐变高亮
-        drawCircleHighlight(cellX: cellX, cellY: cellY,
-                           cellWidth: cellWidth, cellHeight: cellHeight,
-                           style: style)
     }
 
 
@@ -943,6 +879,16 @@ extension CalendarGenerator {
                 let isWeekend = colIndex == 0 || colIndex == 6  // 周日(0)和周六(6)
                 let isToday = today == day
 
+                // 计算文本宽度（用于调整今天高亮圆形大小）
+                let textWidth = calculateDayTextWidth(
+                    day: day,
+                    year: year,
+                    month: month,
+                    cellWidth: layout.columnWidth,
+                    cellHeight: layout.rowHeight,
+                    config: config
+                )
+
                 // 绘制今天的高亮背景
                 if isToday {
                     drawTodayHighlight(
@@ -950,7 +896,8 @@ extension CalendarGenerator {
                         cellY: cellY,
                         cellWidth: layout.columnWidth,
                         cellHeight: layout.rowHeight,
-                        config: config
+                        textWidth: textWidth,
+                        style: config.style
                     )
                 }
 
@@ -974,19 +921,87 @@ extension CalendarGenerator {
     /// 绘制今天的高亮背景
     private func drawTodayHighlight(cellX: CGFloat, cellY: CGFloat,
                                    cellWidth: CGFloat, cellHeight: CGFloat,
+                                   textWidth: CGFloat,
                                    config: CalendarConfig) {
-        // 绘制圆形高亮
-        let circleDiameter = min(cellWidth, cellHeight) * 1.05
-        let circleRect = NSRect(
-            x: cellX + (cellWidth - circleDiameter) / 2,
-            y: cellY + (cellHeight - circleDiameter) / 2,
-            width: circleDiameter,
-            height: circleDiameter
+        // 使用圆角矩形精确包裹文本区域，避免圆形过大污染相邻单元格
+        let textHeight = config.style.dayFont.pointSize
+        let lunarTextHeight = textHeight * config.style.lunarTextSize
+        let totalTextHeight = max(textHeight, lunarTextHeight) // 使用较大的字体高度
+
+        // 计算高亮矩形的尺寸
+        let highlightWidth: CGFloat
+        let highlightHeight: CGFloat
+
+        if config.style.showLunarDate && textWidth > 0 {
+            // 有农历时，宽度基于文本宽度，高度基于字体大小
+            highlightWidth = min(textWidth * 1.15, cellWidth * 0.95)
+            highlightHeight = min(totalTextHeight * 1.4, cellHeight * 0.9)
+        } else {
+            // 无农历时，使用圆形（或接近圆形的圆角矩形）
+            let diameter = min(cellWidth, cellHeight) * 0.85
+            highlightWidth = diameter
+            highlightHeight = diameter
+        }
+
+        // 计算圆角半径（宽度的一半，或者使用固定小值来实现椭圆效果）
+        // 使用较小的圆角半径来实现椭圆/胶囊形状
+        let cornerRadius = min(highlightWidth, highlightHeight) / 2
+
+        // 居中绘制圆角矩形
+        let highlightRect = NSRect(
+            x: cellX + (cellWidth - highlightWidth) / 2,
+            y: cellY + (cellHeight - highlightHeight) / 2,
+            width: highlightWidth,
+            height: highlightHeight
         )
 
         config.style.todayHighlightColor.setFill()
-        let path = NSBezierPath(ovalIn: circleRect)
+        let path = NSBezierPath(roundedRect: highlightRect, xRadius: cornerRadius, yRadius: cornerRadius)
         path.fill()
+    }
+
+    /// 计算日期文本的总宽度（公历+农历）
+    @MainActor
+    private func calculateDayTextWidth(day: Int, year: Int, month: Int,
+                                     cellWidth: CGFloat, cellHeight: CGFloat,
+                                     config: CalendarConfig) -> CGFloat {
+        let dayString = "\(day)"
+        let font = config.style.dayFont
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: config.style.dayTextColor
+        ]
+
+        // 计算农历日期（如果显示）
+        var lunarText: String? = nil
+        if config.style.showLunarDate {
+            let dateFormatter = DateFormatter()
+            dateFormatter.calendar = Calendar.current
+            let dateComponents = DateComponents(year: year, month: month, day: day)
+            if let date = dateFormatter.calendar.date(from: dateComponents) {
+                let lunarDate = LunarDateConverter.shared.convert(date)
+                lunarText = LunarDateConverter.shared.format(lunarDate, format: config.lunarDateFormat)
+            }
+        }
+
+        // 计算完整文本的宽度（公历+空格+农历）
+        let dayTextSize = dayString.size(withAttributes: attributes)
+        let spacer = " "
+        let spacerSize = spacer.size(withAttributes: attributes)
+        var totalTextWidth = dayTextSize.width
+
+        if let lunarText = lunarText {
+            let lunarFontSize = config.style.dayFont.pointSize * config.style.lunarTextSize
+            let lunarFont = NSFont.systemFont(ofSize: lunarFontSize, weight: .light)
+            let lunarAttributes: [NSAttributedString.Key: Any] = [
+                .font: lunarFont,
+                .foregroundColor: config.style.lunarDateColor
+            ]
+            let lunarTextSize = lunarText.size(withAttributes: lunarAttributes)
+            totalTextWidth += spacerSize.width + lunarTextSize.width
+        }
+
+        return totalTextWidth
     }
 
     /// 绘制日期文本
