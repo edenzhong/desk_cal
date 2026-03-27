@@ -92,7 +92,7 @@ struct VisualStyle {
     var lunarSolarTermColor: NSColor = NSColor.systemBlue
 
     /// 农历文字大小比例（相对于公历字体）
-    var lunarTextSize: CGFloat = 0.6
+    var lunarTextSize: CGFloat = 0.75
 
     /// 今天高亮效果样式
     enum TodayHighlightStyle {
@@ -1022,13 +1022,12 @@ extension CalendarGenerator {
             .foregroundColor: textColor
         ]
 
-        // 计算垂直位置
-        var textY = cellY + (cellHeight - font.pointSize) / 2
+        // 计算垂直位置（居中）
+        let textY = cellY + (cellHeight - font.pointSize) / 2
 
-        // 如果显示农历日期，调整公历日期垂直位置
+        // 计算农历日期（如果显示）
         var lunarText: String? = nil
         if config.style.showLunarDate {
-            // 计算农历日期
             let dateFormatter = DateFormatter()
             dateFormatter.calendar = Calendar.current
             let dateComponents = DateComponents(year: year, month: month, day: day)
@@ -1036,31 +1035,71 @@ extension CalendarGenerator {
                 let lunarDate = LunarDateConverter.shared.convert(date)
                 lunarText = LunarDateConverter.shared.format(lunarDate, format: config.lunarDateFormat)
             }
-
-            // 调整公历日期位置向上移动
-            textY = cellY + (cellHeight - font.pointSize) / 2 + (cellHeight * config.style.lunarTextSize * 0.5)
         }
 
-        let textSize = dayString.size(withAttributes: attributes)
-        let textRect = NSRect(
-            x: cellX + (cellWidth - textSize.width) / 2,
-            y: textY,
-            width: textSize.width,
-            height: textSize.height
-        )
+        // 计算完整文本的宽度（公历+空格+农历）
+        let dayTextSize = dayString.size(withAttributes: attributes)
+        let spacer = " "
+        let spacerSize = spacer.size(withAttributes: attributes)
+        var totalTextWidth = dayTextSize.width
 
+        var lunarAttributes: [NSAttributedString.Key: Any]?
+        if let lunarText = lunarText {
+            let lunarFontSize = config.style.dayFont.pointSize * config.style.lunarTextSize
+            let lunarFont = NSFont.systemFont(ofSize: lunarFontSize, weight: .light)
+
+            // 判断农历颜色
+            let isFestival = LunarDateConverter.shared.isFestival(lunarText)
+            let isSolarTerm = LunarDateConverter.shared.isSolarTerm(lunarText)
+
+            let lunarTextColor: NSColor
+            if isFestival {
+                lunarTextColor = config.style.lunarFestivalColor
+            } else if isSolarTerm {
+                lunarTextColor = config.style.lunarSolarTermColor
+            } else {
+                lunarTextColor = config.style.lunarDateColor
+            }
+
+            lunarAttributes = [
+                .font: lunarFont,
+                .foregroundColor: lunarTextColor
+            ]
+
+            let lunarTextSize = lunarText.size(withAttributes: lunarAttributes)
+            totalTextWidth += spacerSize.width + lunarTextSize.width
+        }
+
+        // 计算水平起始位置（居中）
+        let startX = cellX + (cellWidth - totalTextWidth) / 2
+
+        // 绘制公历日期
+        let textRect = NSRect(
+            x: startX,
+            y: textY,
+            width: dayTextSize.width,
+            height: dayTextSize.height
+        )
         dayString.draw(in: textRect, withAttributes: attributes)
 
-        // 绘制农历日期
-        if let lunarText = lunarText {
-            drawLunarText(
-                lunarText: lunarText,
-                cellX: cellX,
-                cellY: cellY,
-                cellWidth: cellWidth,
-                cellHeight: cellHeight,
-                config: config
+        // 绘制农历日期（在公历后面）
+        if let lunarText = lunarText, let lunarAttrs = lunarAttributes {
+            let spacerRect = NSRect(
+                x: startX + dayTextSize.width,
+                y: textY,
+                width: spacerSize.width,
+                height: spacerSize.height
             )
+            spacer.draw(in: spacerRect, withAttributes: attributes)
+
+            let lunarTextSize = lunarText.size(withAttributes: lunarAttrs)
+            let lunarRect = NSRect(
+                x: startX + dayTextSize.width + spacerSize.width,
+                y: textY + (font.pointSize - (config.style.dayFont.pointSize * config.style.lunarTextSize)) / 2,
+                width: lunarTextSize.width,
+                height: lunarTextSize.height
+            )
+            lunarText.draw(in: lunarRect, withAttributes: lunarAttrs)
         }
     }
 
@@ -1091,9 +1130,10 @@ extension CalendarGenerator {
         ]
 
         let textSize = lunarText.size(withAttributes: attributes)
+        // 将农历文字放于单元格下半部分
         let textRect = NSRect(
             x: cellX + (cellWidth - textSize.width) / 2,
-            y: cellY + (cellHeight - fontSize) / 2 - (cellHeight * config.style.lunarTextSize * 0.5),
+            y: cellY + cellHeight * 0.25 - (fontSize / 2),
             width: textSize.width,
             height: textSize.height
         )

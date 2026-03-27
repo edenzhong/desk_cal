@@ -120,7 +120,7 @@ struct AppConfig: Codable {
     var lunarDateFormat: LunarDateFormat = .short
 
     /// 农历文字大小（相对于公历字体大小的比例）
-    var lunarTextSize: CGFloat = 0.6
+    var lunarTextSize: CGFloat = 0.75
 
     /// 默认配置
     static let `default` = AppConfig()
