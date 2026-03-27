@@ -8,7 +8,7 @@
   "today_highlight_style": {
     "type": "circle"
   },
-  "show_lunar_date": false,
+  "show_lunar_date": true,
   "lunar_date_format": "short",
   "lunar_text_size": 0.75,
   "show_holidays": true,

@@ -589,7 +589,7 @@ struct CalendarGenerator {
             highlightHeight = min(totalTextHeight * 1.4, cellHeight * 0.9)
         } else {
             // 无农历时，使用圆形（或接近圆形的圆角矩形）
-            let diameter = min(cellWidth, cellHeight) * 0.85
+            let diameter = min(cellWidth, cellHeight) * 0.95
             highlightWidth = diameter
             highlightHeight = diameter
         }
@@ -996,7 +996,7 @@ extension CalendarGenerator {
             highlightHeight = min(totalTextHeight * 1.4, cellHeight * 0.9)
         } else {
             // 无农历时，使用圆形（或接近圆形的圆角矩形）
-            let diameter = min(cellWidth, cellHeight) * 0.85
+            let diameter = min(cellWidth, cellHeight) * 0.95
             highlightWidth = diameter
             highlightHeight = diameter
         }
@@ -1131,6 +1131,9 @@ extension CalendarGenerator {
             let lunarTextColor: NSColor
             if isToday {
                 // 今天使用对比色（在高亮背景上可见）
+                lunarTextColor = config.style.todayTextColor
+            } else if isHoliday {
+                // 假期中的所有农历文字使用对比色（在假期背景上可见）
                 lunarTextColor = config.style.todayTextColor
             } else if isFestival {
                 lunarTextColor = config.style.lunarFestivalColor
