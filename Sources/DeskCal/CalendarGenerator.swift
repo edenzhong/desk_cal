@@ -1068,7 +1068,10 @@ extension CalendarGenerator {
             let isSolarTerm = LunarDateConverter.shared.isSolarTerm(lunarText)
 
             let lunarTextColor: NSColor
-            if isFestival {
+            if isToday {
+                // 今天使用对比色（在高亮背景上可见）
+                lunarTextColor = config.style.todayTextColor
+            } else if isFestival {
                 lunarTextColor = config.style.lunarFestivalColor
             } else if isSolarTerm {
                 lunarTextColor = config.style.lunarSolarTermColor
