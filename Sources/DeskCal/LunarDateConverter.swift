@@ -56,36 +56,17 @@ public class LunarDateConverter {
 
     // MARK: - 私有属性
 
-    // 农历年信息表 (每个元素包含: 闰月月份, 大月信息, 从1月到12月的累积天数)
-    // 这是一个简化的农历数据表，覆盖1900-2100年
-    // 格式: [闰月(0=无), 月大小(1=大月30天,0=小月29天), 从1月到12月的累积天数]
-    // 数据来源：开源农历库（如 Lunar-iOS）
-    private static let lunarInfo: [Int] = [
-        0x04bd8, 0x04ae0, 0x0a570, 0x054d5, 0x0d260, 0x0d950, 0x16554, 0x056a0, 0x09ad0, 0x055d2,
-        0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540, 0x0d6a0, 0x0ada2, 0x095b0, 0x14977,
-        0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0, 0x095d0, 0x149b7, 0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0,
-        0x0d530, 0x054d5, 0x0a5d0, 0x0d260, 0x0d950, 0x16554, 0x056a0, 0x09ad0, 0x055d2,
-        0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540, 0x0d6a0, 0x0ada2, 0x095b0, 0x14977,
-        0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0, 0x095d0, 0x149b7, 0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0,
-        0x0d530, 0x054d5, 0x0a5d0, 0x0d260, 0x0d950, 0x16554, 0x056a0, 0x09ad0, 0x055d2,
-        0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540, 0x0d6a0, 0x0ada2, 0x095b0, 0x14977,
-        0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0, 0x095d0, 0x149b7, 0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0,
-        0x0d530, 0x054d5, 0x0a5d0, 0x0d260, 0x0d950, 0x16554, 0x056a0, 0x09ad0, 0x055d2,
-        0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540, 0x0d6a0, 0x0ada2, 0x095b0, 0x14977,
-        0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0, 0x095d0, 0x149b7, 0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0,
-        0x0d530, 0x054d5, 0x0a5d0, 0x0d260, 0x0d950, 0x16554, 0x056a0, 0x09ad0, 0x055d2,
-        0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540, 0x0d6a0, 0x0ada2, 0x095b0, 0x14977,
-        0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0, 0x095d0, 0x149b7, 0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0,
-        0x0d530, 0x054d5, 0x0a5d0, 0x0d260, 0x0d950, 0x16554, 0x056a0, 0x09ad0, 0x055d2,
-        0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540, 0x0d6a0, 0x0ada2, 0x095b0, 0x14977,
-        0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0, 0x095d0, 0x149b7, 0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0,
-        0x0d530, 0x054d5, 0x0a5d0, 0x0d260, 0x0d950, 0x16554, 0x056a0, 0x09ad0, 0x055d2,
-        0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540, 0x0d6a0, 0x0ada2, 0x095b0, 0x14977,
-        0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0, 0x095d0, 0x149b7, 0x04970, 0x0a4b0, 0x0b4b5, 0x0a6a0
-    ]
+    // 系统自带的中国农历 Calendar
+    private lazy var chineseCalendar: Calendar = {
+        var calendar = Calendar(identifier: .chinese)
+        calendar.locale = Locale(identifier: "zh_CN")
+        return calendar
+    }()
 
-    // 1900年1月31日是农历1900年正月初一
-    private static let baseDate = Date(timeIntervalSince1970: -2203977600) // 1900-01-31
+    // 公历 Calendar
+    private lazy var gregorianCalendar: Calendar = {
+        return Calendar(identifier: .gregorian)
+    }()
 
     // 天干
     private static let tiangan = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
@@ -125,96 +106,39 @@ public class LunarDateConverter {
     /// - Parameter date: 公历日期
     /// - Returns: 农历日期信息
     public func convert(_ date: Date) -> LunarDate {
-        let calendar = Calendar.current
-        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        // 获取农历年月日
+        let lunarComponents = chineseCalendar.dateComponents([.year, .month, .day, .isLeapMonth], from: date)
+        let lunarYear = lunarComponents.year ?? 0
+        let lunarMonth = lunarComponents.month ?? 0
+        let lunarDay = lunarComponents.day ?? 0
+        let isLeap = lunarComponents.isLeapMonth ?? false
 
-        let solarYear = components.year ?? 2000
-        let solarMonth = components.month ?? 1
-        let solarDay = components.day ?? 1
+        // 获取公历年月日（用于节气计算）
+        let gregorianComponents = gregorianCalendar.dateComponents([.year, .month, .day], from: date)
+        let solarYear = gregorianComponents.year ?? 2000
+        let solarMonth = gregorianComponents.month ?? 1
+        let solarDay = gregorianComponents.day ?? 1
 
-        // 计算距离基准日期的天数
-        let daysSinceBase = Int(date.timeIntervalSince(Self.baseDate) / 86400)
-
-        // 转换为农历年月日
-        var currentYear = 1900
-        var daysLeft = daysSinceBase
-
-        // 确保日期在支持范围内
-        guard daysSinceBase >= 0 else {
-            // 日期早于1900年，返回默认值
-            return LunarDate(
-                year: 1900, month: 1, day: 1, isLeapMonth: false,
-                monthName: "正月", dayName: "初一",
-                ganzhiYear: "庚子", ganzhiMonth: "戊寅", ganzhiDay: "甲子",
-                animal: "鼠", solarTerm: "", festival: ""
-            )
-        }
-
-        // 找到农历年
-        while daysLeft >= 0 && currentYear <= 2100 {
-            let yearDays = getLunarYearDays(currentYear)
-            if daysLeft < yearDays {
-                break
-            }
-            daysLeft -= yearDays
-            currentYear += 1
-        }
-
-        // 超出数据范围处理
-        if currentYear > 2100 {
-            return LunarDate(
-                year: 2100, month: 12, day: 30, isLeapMonth: false,
-                monthName: "腊月", dayName: "三十",
-                ganzhiYear: "庚戌", ganzhiMonth: "戊戌", ganzhiDay: "癸亥",
-                animal: "狗", solarTerm: "", festival: ""
-            )
-        }
-
-        // 找到农历月
-        var lunarMonth = 1
-        var isLeap = false
-
-        while lunarMonth <= 12 {
-            let leapMonth = getLeapMonth(currentYear)
-
-            // 先检查闰月
-            if leapMonth > 0 && lunarMonth == leapMonth {
-                let leapDays = getLeapMonthDays(currentYear)
-                if daysLeft < leapDays {
-                    isLeap = true
-                    break
-                }
-                daysLeft -= leapDays
-                lunarMonth += 1
-                continue
-            }
-
-            let monthDays = getMonthDays(currentYear, lunarMonth)
-            if daysLeft < monthDays {
-                break
-            }
-            daysLeft -= monthDays
-            lunarMonth += 1
-        }
-
-        let lunarDay = max(1, min(daysLeft + 1, 30))
+        // 系统的 Chinese Calendar 返回的年份是一个偏移值
+        // 实际农历年 = 系统农历年 + 1983
+        let actualYear = lunarYear + 1983
 
         // 限制数组索引范围
         let safeMonthIndex = max(0, min(lunarMonth - 1, 11))
         let safeDayIndex = max(0, min(lunarDay - 1, 29))
 
         return LunarDate(
-            year: currentYear,
+            year: actualYear,
             month: lunarMonth,
             day: lunarDay,
             isLeapMonth: isLeap,
             monthName: Self.lunarMonths[safeMonthIndex] + "月",
             dayName: Self.lunarDays[safeDayIndex],
-            ganzhiYear: getGanzhiYear(currentYear),
-            ganzhiMonth: getGanzhiMonth(currentYear, lunarMonth),
-            ganzhiDay: getGanzhiDay(currentYear, lunarMonth, lunarDay),
-            animal: Self.animals[(currentYear - 4) % 12],
-            solarTerm: getCurrentSolarTerm(solarMonth, solarDay),
+            ganzhiYear: getGanzhiYear(actualYear),
+            ganzhiMonth: getGanzhiMonth(actualYear, lunarMonth),
+            ganzhiDay: getGanzhiDay(date),
+            animal: Self.animals[(actualYear - 4) % 12],
+            solarTerm: getCurrentSolarTerm(solarYear, solarMonth, solarDay),
             festival: getFestival(lunarMonth, lunarDay)
         )
     }
@@ -237,43 +161,6 @@ public class LunarDateConverter {
 
     // MARK: - 私有辅助方法
 
-    /// 获取农历年的总天数
-    private func getLunarYearDays(_ year: Int) -> Int {
-        var sum = 348
-        let info = Self.lunarInfo[year - 1900]
-
-        // 检查12个月的大小（从低位到高位）
-        // 每个月用一个bit表示，从bit 4到bit 15
-        for i in 0...11 {
-            let bit = 0x10000 >> (i + 1)
-            if (info & bit) != 0 {
-                sum += 1
-            }
-        }
-
-        return sum + getLeapMonthDays(year)
-    }
-
-    /// 获取闰月的天数
-    private func getLeapMonthDays(_ year: Int) -> Int {
-        if getLeapMonth(year) == 0 {
-            return 0
-        }
-        return (Self.lunarInfo[year - 1900] & 0x10000) != 0 ? 30 : 29
-    }
-
-    /// 获取闰月月份 (0表示无闰月)
-    private func getLeapMonth(_ year: Int) -> Int {
-        return Self.lunarInfo[year - 1900] & 0xf
-    }
-
-    /// 获取农历月的天数
-    private func getMonthDays(_ year: Int, _ month: Int) -> Int {
-        let info = Self.lunarInfo[year - 1900]
-        let mask = 0x10000 >> (month - 1)
-        return (info & mask) != 0 ? 30 : 29
-    }
-
     /// 获取天干地支年
     private func getGanzhiYear(_ year: Int) -> String {
         let index = (year - 4) % 60
@@ -282,21 +169,23 @@ public class LunarDateConverter {
 
     /// 获取天干地支月
     private func getGanzhiMonth(_ year: Int, _ month: Int) -> String {
-        // 简化计算
         let index = (year - 4) * 12 + month
         return Self.tiangan[index % 10] + Self.dizhi[index % 12]
     }
 
-    /// 获取天干地支日
-    private func getGanzhiDay(_ year: Int, _ _month: Int, _ day: Int) -> String {
-        // 简化计算
-        let index = (year - 4) * 365 + _month * 30 + day
+    /// 获取天干地支日（基于日期计算）
+    private func getGanzhiDay(_ date: Date) -> String {
+        // 使用公历 1900-01-31 作为基准日（庚子日）
+        let baseDate = Date(timeIntervalSince1970: -2203977600)
+        let days = Int(date.timeIntervalSince(baseDate) / 86400)
+        let index = (days + 60) % 60 // 60 是庚子的偏移
         return Self.tiangan[index % 10] + Self.dizhi[index % 12]
     }
 
     /// 获取当前节气
-    private func getCurrentSolarTerm(_ month: Int, _ day: Int) -> String {
-        // 节气日期近似值（每年略有变化）
+    private func getCurrentSolarTerm(_ year: Int, _ month: Int, _ day: Int) -> String {
+        // 简化节气计算，使用近似日期
+        // 实际节气日期每年略有变化，精确计算需要天文公式
         let solarTermDays = [
             (1, 6), (1, 20), (2, 4), (2, 19), (3, 6), (3, 21), (4, 5), (4, 20),
             (5, 6), (5, 21), (6, 6), (6, 21), (7, 7), (7, 23), (8, 8), (8, 23),
