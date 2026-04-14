@@ -29,8 +29,8 @@ enum WallpaperManagerError: Error {
 struct WallpaperOptions {
     /// 图片缩放方式
     var scaling: NSImageScaling = .scaleProportionallyUpOrDown
-    /// 是否允许裁剪
-    var allowClipping: Bool = true
+    /// 是否允许裁剪（false = 适合于屏幕，完整显示图片）
+    var allowClipping: Bool = false
     /// 填充颜色（可选）
     var fillColor: NSColor? = nil
 

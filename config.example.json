@@ -14,6 +14,7 @@
   "show_holidays": true,
   "holiday_cache_days": 30,
   "holiday_highlight_style": "background",
+  "set_wallpaper_for_all_screens": true,
   "custom_colors": {
     "today_highlight_color": "#007AFF",
     "weekend_text_color": "#FF3B30",
