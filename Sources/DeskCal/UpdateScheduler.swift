@@ -98,8 +98,16 @@ struct UpdateScheduler {
             // 生成日历图片
             let image = try generateCalendarImage(mode: mode)
 
-            // 设置墙纸
-            try WallpaperManager.setWallpaper(image: image)
+            // 获取配置，决定是否为所有屏幕设置墙纸
+            let setForAllScreens = ConfigurationManager.shared.config.setWallpaperForAllScreens
+
+            if setForAllScreens {
+                let screenCount = try WallpaperManager.setWallpaperForAllScreens(image: image)
+                logInfo("Wallpaper set for \(screenCount) screens")
+            } else {
+                try WallpaperManager.setWallpaper(image: image)
+                logInfo("Wallpaper set for main screen only")
+            }
 
             // 记录成功
             recordUpdateSuccess()

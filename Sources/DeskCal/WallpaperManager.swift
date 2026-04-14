@@ -5,6 +5,18 @@
 import AppKit
 import Foundation
 
+// MARK: - 日志快捷方法
+
+@MainActor
+private func logInfo(_ message: String) {
+    Logger.shared.info("[WallpaperManager] \(message)")
+}
+
+@MainActor
+private func logError(_ message: String) {
+    Logger.shared.error("[WallpaperManager] \(message)")
+}
+
 /// 墙纸管理错误类型
 enum WallpaperManagerError: Error {
     case noMainScreen
@@ -151,6 +163,47 @@ struct WallpaperManager {
     /// - Returns: 主屏幕，如果没有则返回nil
     static func getMainScreen() -> NSScreen? {
         return NSScreen.main
+    }
+
+    /// 为所有屏幕设置墙纸
+    /// 如果某个屏幕设置失败，会继续设置其他屏幕
+    /// - Parameters:
+    ///   - image: 要设置为墙纸的图片
+    ///   - options: 墙纸选项（默认值使用默认选项）
+    /// - Returns: 成功设置的屏幕数量
+    /// - Throws: 如果所有屏幕都设置失败，则抛出错误
+    @MainActor
+    static func setWallpaperForAllScreens(
+        image: NSImage,
+        options: WallpaperOptions = .default
+    ) throws -> Int {
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else {
+            throw WallpaperManagerError.noMainScreen
+        }
+
+        var successCount = 0
+        var errors: [String] = []
+
+        for (index, screen) in screens.enumerated() {
+            do {
+                try setWallpaper(image: image, options: options, screen: screen)
+                successCount += 1
+                logInfo("Successfully set wallpaper for screen \(index)")
+            } catch {
+                let errorMessage = "Failed to set wallpaper for screen \(index): \(error.localizedDescription)"
+                logError(errorMessage)
+                errors.append(errorMessage)
+                // 继续设置其他屏幕
+            }
+        }
+
+        if successCount == 0 {
+            throw WallpaperManagerError.systemError(description: "Failed to set wallpaper on any screen. Errors: \(errors.joined(separator: "; "))")
+        }
+
+        logInfo("Wallpaper set for \(successCount) out of \(screens.count) screens")
+        return successCount
     }
 
     // MARK: - 私有方法

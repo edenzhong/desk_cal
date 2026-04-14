@@ -138,6 +138,9 @@ struct AppConfig: Codable {
     /// 假期高亮样式
     var holidayHighlightStyle: HolidayHighlightStyle = .background
 
+    /// 是否为所有屏幕设置墙纸（默认 true）
+    var setWallpaperForAllScreens: Bool = true
+
     /// 默认配置
     static let `default` = AppConfig()
 
